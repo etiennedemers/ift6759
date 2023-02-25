@@ -11,6 +11,8 @@ conda activate climatenet
 conda install ipykernel
 python -m ipykernel install --user --name climatenet --display-name "climatenet"
 
+If conda_env has been changed since the last time you installed the environment, run `conda env update --file conda_env.yml --prune`.
+
 You can find the data and a pre-trained model at [https://portal.nersc.gov/project/ClimateNet/](https://portal.nersc.gov/project/ClimateNet/).
 Download the train and test data and the trained model, and you're good-to-go.
 
