@@ -145,6 +145,8 @@ class CGNet():
         print(aggregate_cm)
         ious = get_iou_perClass(aggregate_cm)
         print('IOUs: ', ious, ', mean: ', ious.mean())
+        
+        return aggregate_cm, ious
 
     def save_model(self, save_path: str):
         '''
@@ -165,6 +167,83 @@ class CGNet():
         self.config = Config(path.join(model_path, 'config.json'))
         self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields))).cuda()
         self.network.load_state_dict(torch.load(path.join(model_path, 'weights.pth')))
+        
+        
+class CGNetWithThreshold(CGNet):
+
+    def __init__(self, config: Config = None, model_path: str = None, threshold=0.5):
+
+        self.threshold = threshold
+
+        if config is not None and model_path is not None:
+            raise ValueError('''Config and weight path set at the same time. 
+            Pass a config if you want to create a new model, 
+            and a weight_path if you want to load an existing model.''')
+
+        if config is not None:
+            # Create new model
+            self.config = config
+            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields))).cuda()
+        elif model_path is not None:
+            # Load model
+            self.config = Config(path.join(model_path, 'config.json'))
+            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields))).cuda()
+            self.network.load_state_dict(torch.load(path.join(model_path, 'weights.pth')))
+        else:
+            raise ValueError('''You need to specify either a config or a model path.''')
+
+    def predict(self, dataset: ClimateDataset, save_dir: str = None):
+        '''Make predictions for the given dataset and return them as xr.DataArray'''
+        self.network.eval()
+        collate = ClimateDataset.collate
+        loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate)
+        epoch_loader = tqdm(loader)
+
+        predictions = []
+        for batch in epoch_loader:
+            features = torch.tensor(batch.values).cuda()
+
+            with torch.no_grad():
+                outputs = torch.softmax(self.network(features), 1)
+            print(outputs)
+            preds = torch.max(outputs, 1)[1].cpu().numpy()
+            print(preds)
+            assert 1 == 2
+
+            coords = batch.coords
+            del coords['variable']
+
+            dims = [dim for dim in batch.dims if dim != "variable"]
+
+            predictions.append(xr.DataArray(preds, coords=coords, dims=dims, attrs=batch.attrs))
+
+        return xr.concat(predictions, dim='time')
+    
+    def evaluate(self, dataset: ClimateDatasetLabeled):
+        '''Evaluate on a dataset and return statistics'''
+        self.network.eval()
+        collate = ClimateDatasetLabeled.collate
+        loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate, num_workers=4)
+
+        epoch_loader = tqdm(loader)
+        aggregate_cm = np.zeros((3,3))
+
+        for features, labels in epoch_loader:
+        
+            features = torch.tensor(features.values).cuda()
+            labels = torch.tensor(labels.values).cuda()
+                
+            with torch.no_grad():
+                outputs = torch.softmax(self.network(features), 1)
+            predictions = torch.max(outputs, 1)[1]
+            aggregate_cm += get_cm(predictions, labels, 3)
+
+        print('Evaluation stats:')
+        print(aggregate_cm)
+        ious = get_iou_perClass(aggregate_cm)
+        print('IOUs: ', ious, ', mean: ', ious.mean())
+        
+        return aggregate_cm, ious, outputs, predictions
 
 
 class CGNetModule(nn.Module):
