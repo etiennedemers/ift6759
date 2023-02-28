@@ -30,7 +30,13 @@ def main(args):
     X_test = test_df[features].values
     y_test = test_df['LABELS'].values
 
-    model_cls = {'logReg':LogisticRegression, 'xgboost':XGBClassifier}[args.model]
+    if args.standardize:
+        train_avg = np.mean(X_train, axis=0)
+        train_std = np.std(X_train, axis=0)
+        X_train = (X_train - train_avg) / train_std
+        X_test = (X_test - train_avg) / train_std
+
+    model_cls = {'LogReg':LogisticRegression, 'XGBoost':XGBClassifier}[args.model]
     model = model_cls(**model_config)
     model.fit(X_train,y_train)
     preds = model.predict(X_test)

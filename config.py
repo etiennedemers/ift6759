@@ -10,13 +10,16 @@ def get_config_parser():
     data.add_argument(
         "--train_path", type=str, default='data', help="Train Path"
     )
+    data.add_argument(
+        "--standardize", type=bool, default=True, help="Train Path"
+    )
 
     model = parser.add_argument_group("Model")
     model.add_argument(
         "--model",
         type=str,
-        choices=[ "logReg", "xgboost"],
-        default="xgboost",
+        choices=[ "LogReg", "XGBoost"],
+        default="XGBoost",
         help="name of the model to run (default: %(default)s).",
     )
     model.add_argument(
