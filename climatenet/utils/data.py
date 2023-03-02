@@ -89,7 +89,7 @@ def sample(output_path,n,method='rand'):
         select_files = []
         for date in select_dates:
             reg = re.compile('data-' + date)
-            select_files.extend([file for file in files if reg.match(file)])
+            select_files.append([file for file in files if reg.match(file)][0])
 
     for file in select_files:
         if file in listdir('data/test'):
