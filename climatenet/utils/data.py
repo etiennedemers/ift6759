@@ -1,6 +1,10 @@
 from torch.utils.data import Dataset
-from os import listdir, path
+from os import listdir, path, makedirs
+from shutil import copy
+import json
+import re
 import xarray as xr
+import numpy as np
 from climatenet.utils.utils import Config
 
 class ClimateDataset(Dataset):
@@ -72,3 +76,26 @@ class ClimateDatasetLabeled(ClimateDataset):
     def collate(batch):
         data, labels = map(list, zip(*batch))
         return xr.concat(data, dim='time'), xr.concat(labels, dim='time')
+    
+def sample(output_path,n,method='rand'):
+    files = listdir('data/train')
+    files.extend(listdir('data/test'))
+    if method == 'rand':
+        select_files = np.random.permutation(files)[:n]
+    if method == 'curriculum':
+        with open('data/currScore.json','r') as f:
+            score_dict = json.load(f)
+        select_dates = [k for k, v in sorted(score_dict.items(), key=lambda item: item[1], reverse=True)][:n]
+        select_files = []
+        for date in select_dates:
+            reg = re.compile('data-' + date)
+            select_files.extend([file for file in files if reg.match(file)])
+
+    for file in select_files:
+        if file in listdir('data/test'):
+            base_path = 'data/test/'
+        else:
+             base_path = 'data/train/'
+        makedirs(output_path, exist_ok=True)
+        copy(path.join(base_path, file), output_path)
+    
