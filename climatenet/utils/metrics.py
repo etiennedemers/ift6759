@@ -1,5 +1,13 @@
 import numpy as np
 import torch
+import netCDF4
+import json
+from os import listdir
+from tqdm import tqdm
+import re
+import xarray as xr
+import itertools
+from sklearn.metrics import confusion_matrix
 
 def get_iou_perClass(confM):
     """
@@ -14,6 +22,7 @@ def get_iou_perClass(confM):
             iouPerClass[i] = confM.diagonal()[i] / unionPerClass[i]
     return iouPerClass
         
+
 def get_cm(pred, gt, n_classes=3):
     cm = np.zeros((n_classes, n_classes))
     for i in range(len(pred)):
@@ -27,3 +36,34 @@ def get_cm(pred, gt, n_classes=3):
                 cm[actual][predicted] += len(torch.nonzero(is_actual & is_pred))
             
     return cm
+
+
+def currScore(output_path):
+    files = listdir('data/train')
+    files.extend(listdir('data/test'))
+    dates = set(['-'.join(file.split('-')[1:-2]) for file in files])
+    score_dict = {}
+    for date in tqdm(dates):
+        reg = re.compile('data-' + date)
+        duplicates = [file for file in files if reg.match(file)]
+        if len(duplicates) < 2:
+            date_score = -1
+        else:
+            score_list = []
+            for f1, f2 in itertools.combinations(duplicates,2):
+                if f1 in listdir('data/test'):
+                    base_path = 'data/test/'
+                else:
+                    base_path = 'data/train/'
+                labels1 = torch.tensor(xr.load_dataset(base_path + f1)['LABELS'].values)
+                labels2 = torch.tensor(xr.load_dataset(base_path + f2)['LABELS'].values)
+                cm = get_cm(labels1, labels2)
+                ious = get_iou_perClass(cm)
+                mean_iou = ious.mean()
+                score_list.append(mean_iou)
+            date_score = np.array(score_list).mean()
+        score_dict.update({date:date_score})
+
+    with open(output_path, 'w') as f:
+        json.dump(score_dict,f)
+    return
