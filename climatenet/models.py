@@ -15,7 +15,8 @@ from tqdm import tqdm
 import numpy as np
 import xarray as xr
 from climatenet.utils.utils import Config
-from os import path
+from os import path, makedirs
+import json
 import pathlib
 
 class CGNet():
@@ -42,7 +43,7 @@ class CGNet():
         Stores the optimizer we use for training the model
     '''
 
-    def __init__(self, config: Config = None, model_path: str = None):
+    def __init__(self, config: Config = None, model_path: str = None, save_dir: str = 'results/'):
     
         if config is not None and model_path is not None:
             raise ValueError('''Config and weight path set at the same time. 
@@ -61,13 +62,17 @@ class CGNet():
         else:
             raise ValueError('''You need to specify either a config or a model path.''')
 
-        self.optimizer = Adam(self.network.parameters(), lr=self.config.lr)        
+        self.optimizer = Adam(self.network.parameters(), lr=self.config.lr) 
+        self.save_dir = save_dir       
         
     def train(self, dataset: ClimateDatasetLabeled):
         '''Train the network on the given dataset for the given amount of epochs'''
         self.network.train()
         collate = ClimateDatasetLabeled.collate
         loader = DataLoader(dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=4, shuffle=True)
+        train_losses = []
+        train_ious = []
+
         for epoch in range(1, self.config.epochs+1):
 
             print(f'Epoch {epoch}:')
@@ -92,13 +97,26 @@ class CGNet():
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad() 
+                train_losses.append(loss.item())
 
             print('Epoch stats:')
             print(aggregate_cm)
             ious = get_iou_perClass(aggregate_cm)
+            train_ious.append(ious.mean())
             print('IOUs: ', ious, ', mean: ', ious.mean())
 
-    def predict(self, dataset: ClimateDataset, save_dir: str = None):
+        print(f'Writing training logs to {self.save_dir}...')
+        makedirs(self.save_dir, exist_ok=True)
+        with open(path.join(self.save_dir, 'trainResults.json'), 'w') as f:
+            f.write(json.dumps(
+                {
+                    "train_losses": train_losses,
+                    "train_ious": train_ious,
+                },
+                indent=4,
+            ))
+
+    def predict(self, dataset: ClimateDataset):
         '''Make predictions for the given dataset and return them as xr.DataArray'''
         self.network.eval()
         collate = ClimateDataset.collate
@@ -126,7 +144,7 @@ class CGNet():
         '''Evaluate on a dataset and return statistics'''
         self.network.eval()
         collate = ClimateDatasetLabeled.collate
-        loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate, num_workers=4)
+        loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate, num_workers=1)
 
         epoch_loader = tqdm(loader)
         aggregate_cm = np.zeros((3,3))

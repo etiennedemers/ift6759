@@ -7,7 +7,6 @@ from tqdm import tqdm
 import re
 import xarray as xr
 import itertools
-from sklearn.metrics import confusion_matrix
 
 def get_iou_perClass(confM):
     """
@@ -33,8 +32,7 @@ def get_cm(pred, gt, n_classes=3):
             for predicted in range(n_classes):
                 is_actual = torch.eq(gt_tmp, actual)
                 is_pred = torch.eq(pred_tmp, predicted)
-                cm[actual][predicted] += len(torch.nonzero(is_actual & is_pred))
-            
+                cm[actual][predicted] += len(torch.nonzero(is_actual & is_pred))  
     return cm
 
 
