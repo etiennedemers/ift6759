@@ -82,5 +82,10 @@ def results_plots(save_dir: str):
           fancybox=True, facecolor='white')
     plt.savefig(path.join(save_dir,'resultsFigures.png'), bbox_inches='tight')
 
-results_plots('/Users/vincentlongpre/Documents/Devoirs/IFT6759/ift6759/results/') 
+def print_currScore(currScore_path):
+    with open(path.join(currScore_path),'r') as f:
+        currScore_dict = json.load(f)
+    print(np.mean(([currScore_dict[k]  for k in currScore_dict.keys()]),axis=0))
+    plt.hist(currScore_dict.values(),bins=20, range=(0,1))
+    plt.show()
         

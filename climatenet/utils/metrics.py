@@ -57,10 +57,9 @@ def currScore(output_path):
                 labels2 = torch.tensor(xr.load_dataset(base_path + f2)['LABELS'].values)
                 cm = get_cm(labels1, labels2)
                 ious = get_iou_perClass(cm)
-                mean_iou = ious.mean()
-                score_list.append(mean_iou)
-            date_score = np.array(score_list).mean()
-        score_dict.update({date:date_score})
+                score_list.append(ious)
+            date_ious = np.array(score_list).mean(axis=0)
+        score_dict.update({date:list(date_ious)})
 
     with open(output_path, 'w') as f:
         json.dump(score_dict,f)

@@ -65,45 +65,60 @@ class CGNet():
         self.optimizer = Adam(self.network.parameters(), lr=self.config.lr) 
         self.save_dir = save_dir       
         
-    def train(self, dataset: ClimateDatasetLabeled):
+    def train(self, curriculum: bool = False):
         '''Train the network on the given dataset for the given amount of epochs'''
         self.network.train()
-        collate = ClimateDatasetLabeled.collate
-        loader = DataLoader(dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=4, shuffle=True)
         train_losses = []
         train_ious = []
+        val_losses = []
+        val_ious = []
 
-        for epoch in range(1, self.config.epochs+1):
+        if curriculum:
+            training_phases = ['simple','medium','hard']
+        else:
+            training_phases = ['union']
 
-            print(f'Epoch {epoch}:')
-            epoch_loader = tqdm(loader)
-            aggregate_cm = np.zeros((3,3))
+        val_dataset = ClimateDatasetLabeled('data/validationSet', self.config)
 
-            for features, labels in epoch_loader:
-        
-                # Push data on GPU and pass forward
-                features = torch.tensor(features.values).cuda()
-                labels = torch.tensor(labels.values).cuda()
-                
-                outputs = torch.softmax(self.network(features), 1)
+        for phase in training_phases:
+            print(f'Starting {phase} training phase...')
+            train_dataset = ClimateDatasetLabeled('data/'+phase+'Set', self.config)
+            collate = ClimateDatasetLabeled.collate
+            loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=2, shuffle=True)
+            for epoch in range(1, self.config.epochs+1):
 
-                # Update training CM
-                predictions = torch.max(outputs, 1)[1]
-                aggregate_cm += get_cm(predictions, labels, 3)
+                print(f'Epoch {epoch}:')
+                epoch_loader = tqdm(loader)
+                aggregate_cm = np.zeros((3,3))
 
-                # Pass backward
-                loss = jaccard_loss(outputs, labels)
-                epoch_loader.set_description(f'Loss: {loss.item()}')
-                loss.backward()
-                self.optimizer.step()
-                self.optimizer.zero_grad() 
+                for features, labels in epoch_loader:
+            
+                    # Push data on GPU and pass forward
+                    features = torch.tensor(features.values).cuda()
+                    labels = torch.tensor(labels.values).cuda()
+                    
+                    outputs = torch.softmax(self.network(features), 1)
+
+                    # Update training CM
+                    predictions = torch.max(outputs, 1)[1]
+                    aggregate_cm += get_cm(predictions, labels, 3)
+
+                    # Pass backward
+                    loss = jaccard_loss(outputs, labels)
+                    epoch_loader.set_description(f'Loss: {loss.item()}')
+                    loss.backward()
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+
+                print('Epoch stats:')
+                ious = get_iou_perClass(aggregate_cm)
+                val_loss, val_iou = self.evaluate(val_dataset)
+                val_losses.append(val_loss)
+                val_ious.append(val_iou.mean())
                 train_losses.append(loss.item())
-
-            print('Epoch stats:')
-            print(aggregate_cm)
-            ious = get_iou_perClass(aggregate_cm)
-            train_ious.append(ious.mean())
-            print('IOUs: ', ious, ', mean: ', ious.mean())
+                train_ious.append(ious.mean())
+                print('IOUs: ', ious, ', mean: ', ious.mean())
+                print('Val IOUs:', val_iou, ', mean:', val_iou.mean())
 
         print(f'Writing training logs to {self.save_dir}...')
         makedirs(self.save_dir, exist_ok=True)
@@ -112,6 +127,8 @@ class CGNet():
                 {
                     "train_losses": train_losses,
                     "train_ious": train_ious,
+                    "valid_losses": val_losses,
+                    "valid_ious": val_ious
                 },
                 indent=4,
             ))
@@ -140,7 +157,7 @@ class CGNet():
 
         return xr.concat(predictions, dim='time')
 
-    def evaluate(self, dataset: ClimateDatasetLabeled):
+    def evaluate(self, dataset: ClimateDatasetLabeled, verbose: bool = False):
         '''Evaluate on a dataset and return statistics'''
         self.network.eval()
         collate = ClimateDatasetLabeled.collate
@@ -159,10 +176,12 @@ class CGNet():
             predictions = torch.max(outputs, 1)[1]
             aggregate_cm += get_cm(predictions, labels, 3)
 
-        print('Evaluation stats:')
-        print(aggregate_cm)
         ious = get_iou_perClass(aggregate_cm)
-        print('IOUs: ', ious, ', mean: ', ious.mean())
+        if verbose:
+            print('Evaluation stats:')
+            print(aggregate_cm)
+            print('IOUs: ', ious, ', mean: ', ious.mean())
+        return jaccard_loss(outputs,labels.cpu()).item(), ious
 
     def save_model(self, save_path: str):
         '''

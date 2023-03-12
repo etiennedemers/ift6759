@@ -77,7 +77,18 @@ class ClimateDatasetLabeled(ClimateDataset):
         data, labels = map(list, zip(*batch))
         return xr.concat(data, dim='time'), xr.concat(labels, dim='time')
     
-def sample(output_path,n,method='rand'):
+    
+def save_datefiles(files,output_path):
+    for file in files:
+        if file in listdir('data/test'):
+            base_path = 'data/test/'
+        else:
+             base_path = 'data/train/'
+        makedirs(output_path, exist_ok=True)
+        copy(path.join(base_path, file), output_path)
+
+    
+def sample_subset(output_path,n,method='rand'):
     files = listdir('data/train')
     files.extend(listdir('data/test'))
     if method == 'rand':
@@ -91,11 +102,40 @@ def sample(output_path,n,method='rand'):
             reg = re.compile('data-' + date)
             select_files.append([file for file in files if reg.match(file)][0])
 
-    for file in select_files:
-        if file in listdir('data/test'):
-            base_path = 'data/test/'
-        else:
-             base_path = 'data/train/'
-        makedirs(output_path, exist_ok=True)
-        copy(path.join(base_path, file), output_path)
+    save_datefiles(select_files,output_path)
     
+def create_datasets(data_path):
+    files = listdir('data/train')
+    files.extend(listdir('data/test'))
+
+    with open('data/currScore.json','r') as f:
+            score_dict = json.load(f)
+
+    unique = [k for k, v in score_dict.items() if score_dict[k]==-1]
+    val_dates = unique[:40]
+    test_dates = unique[40:][:61]
+
+    tresh_dict = {'validation':'','test':'','simple':0.55,'medium':0.475,'hard':-10}
+
+    for dataset, tresh in tresh_dict.items():
+        if dataset == 'validation':
+            select_dates = val_dates
+        elif dataset == 'test':
+            select_dates = test_dates
+        else:
+            select_dates = [k for k, v in score_dict.items() if score_dict[k]>tresh]
+        
+        for k in select_dates:
+            score_dict.pop(k, None)
+
+        select_files = []
+        for date in select_dates:
+            reg = re.compile('data-' + date)
+            select_files.extend([file for file in files if reg.match(file)])
+
+        output_path = path.join(data_path, dataset+'Set')
+        save_datefiles(select_files,output_path)
+        if dataset in ['simple', 'medium', 'hard']:
+            output_path = path.join(data_path, 'unionSet')
+            save_datefiles(select_files,output_path)
+        
