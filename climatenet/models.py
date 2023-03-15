@@ -90,6 +90,9 @@ class CGNet():
                 print(f'Epoch {epoch}:')
                 epoch_loader = tqdm(loader)
                 aggregate_cm = np.zeros((3,3))
+                
+                train_jaccard_losses = []
+                train_batch_sizes = []
 
                 for features, labels in epoch_loader:
             
@@ -109,13 +112,19 @@ class CGNet():
                     loss.backward()
                     self.optimizer.step()
                     self.optimizer.zero_grad()
+                    
+                    train_jaccard_losses.append(loss.item())
+                    train_batch_sizes.append(labels.shape[0])
 
                 print('Epoch stats:')
                 ious = get_iou_perClass(aggregate_cm)
                 val_loss, val_iou = self.evaluate(val_dataset)
                 val_losses.append(val_loss)
                 val_ious.append(val_iou.mean())
-                train_losses.append(loss.item())
+                train_batch_sizes = np.array(train_batch_sizes)
+                train_jaccard_losses = np.array(train_jaccard_losses)
+                weighted_average_jaccard_losses = (train_batch_sizes * train_jaccard_losses).sum() / train_batch_sizes.sum()
+                train_losses.append(train_jaccard_losses)
                 train_ious.append(ious.mean())
                 print('IOUs: ', ious, ', mean: ', ious.mean())
                 print('Val IOUs:', val_iou, ', mean:', val_iou.mean())
