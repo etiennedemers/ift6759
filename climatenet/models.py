@@ -165,6 +165,8 @@ class CGNet():
 
         epoch_loader = tqdm(loader)
         aggregate_cm = np.zeros((3,3))
+        jaccard_losses = []
+        batch_sizes = []
 
         for features, labels in epoch_loader:
         
@@ -176,12 +178,45 @@ class CGNet():
             predictions = torch.max(outputs, 1)[1]
             aggregate_cm += get_cm(predictions, labels, 3)
 
+            jaccard_losses.append(jaccard_loss(outputs, labels.cpu()).item())
+            batch_sizes.append(labels.shape[0])
+
         ious = get_iou_perClass(aggregate_cm)
+        batch_sizes = np.array(batch_sizes)
+        jaccard_losses = np.array(jaccard_losses)
+        weighted_average_jaccard_losses = (batch_sizes * jaccard_losses).sum() / batch_sizes.sum()
+
         if verbose:
             print('Evaluation stats:')
             print(aggregate_cm)
             print('IOUs: ', ious, ', mean: ', ious.mean())
-        return jaccard_loss(outputs,labels.cpu()).item(), ious
+
+        return weighted_average_jaccard_losses, ious
+    
+    def get_ious_for_each_file(self, dataset: ClimateDatasetLabeled):
+
+        assert self.config.pred_batch_size==1, "can only get the ious for each file if pred_batch_size=1"
+
+        self.network.eval()
+        collate = ClimateDatasetLabeled.collate
+        loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate, num_workers=1)
+
+        epoch_loader = tqdm(loader)
+        ious = []
+
+        for features, labels in epoch_loader:
+
+            features = torch.tensor(features.values).cuda()
+            labels = torch.tensor(labels.values).cuda()
+
+            with torch.no_grad():
+                outputs = torch.softmax(self.network(features), 1)
+            predictions = torch.max(outputs, 1)[1]
+
+            cm = get_cm(predictions, labels, 3)
+            ious.append(get_iou_perClass(cm))
+
+        return np.stack(ious, axis=0)
 
     def save_model(self, save_path: str):
         '''
