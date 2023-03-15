@@ -202,7 +202,7 @@ class CGNet():
 
         return weighted_average_jaccard_losses, ious
     
-    def get_ious_for_each_file(self, dataset: ClimateDatasetLabeled):
+    def get_cm_for_each_file(self, dataset: ClimateDatasetLabeled):
 
         assert self.config.pred_batch_size==1, "can only get the ious for each file if pred_batch_size=1"
 
@@ -211,7 +211,7 @@ class CGNet():
         loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate, num_workers=1)
 
         epoch_loader = tqdm(loader)
-        ious = []
+        cms = []
 
         for features, labels in epoch_loader:
 
@@ -222,10 +222,9 @@ class CGNet():
                 outputs = torch.softmax(self.network(features), 1)
             predictions = torch.max(outputs, 1)[1]
 
-            cm = get_cm(predictions, labels, 3)
-            ious.append(get_iou_perClass(cm))
+            cms.append(get_cm(predictions, labels, 3))
 
-        return np.stack(ious, axis=0)
+        return np.stack(cms)
 
     def save_model(self, save_path: str):
         '''

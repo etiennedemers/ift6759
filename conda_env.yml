@@ -106,3 +106,4 @@ dependencies:
   - zstd=1.4.5=h9ceee32_0
   - pip:
     - haversine==2.3.0
+    - seaborn
