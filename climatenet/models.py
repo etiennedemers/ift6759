@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 import xarray as xr
+from time import time 
 from climatenet.utils.utils import Config
 from os import path, makedirs
 import json
@@ -78,18 +79,22 @@ class CGNet():
         else:
             training_phases = ['union']
 
-        val_dataset = ClimateDatasetLabeled('data/validationSet', self.config)
+        val_dataset = ClimateDatasetLabeled('data/curriculum/validationSet', self.config)
 
+        start = time()
         for phase in training_phases:
             print(f'Starting {phase} training phase...')
-            train_dataset = ClimateDatasetLabeled('data/'+phase+'Set', self.config)
+            train_dataset = ClimateDatasetLabeled('data/curriculum/'+phase+'Set', self.config)
             collate = ClimateDatasetLabeled.collate
-            loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=2, shuffle=True)
-            for epoch in range(1, self.config.epochs+1):
+            loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=1, shuffle=True)
+            for epoch in range(self.config.epochs[phase]):
 
-                print(f'Epoch {epoch}:')
+                print(f'Epoch {epoch+1}:')
                 epoch_loader = tqdm(loader)
                 aggregate_cm = np.zeros((3,3))
+
+                train_jaccard_losses = []
+                train_batch_sizes = []
 
                 for features, labels in epoch_loader:
             
@@ -110,16 +115,26 @@ class CGNet():
                     self.optimizer.step()
                     self.optimizer.zero_grad()
 
+                    train_jaccard_losses.append(loss.item())
+                    train_batch_sizes.append(labels.shape[0])
+
                 print('Epoch stats:')
                 ious = get_iou_perClass(aggregate_cm)
                 val_loss, val_iou = self.evaluate(val_dataset)
                 val_losses.append(val_loss)
                 val_ious.append(val_iou.mean())
-                train_losses.append(loss.item())
+                train_batch_sizes = np.array(train_batch_sizes)
+                train_jaccard_losses = np.array(train_jaccard_losses)
+                weighted_average_jaccard_losses = (train_batch_sizes * train_jaccard_losses).sum() / train_batch_sizes.sum()
+                train_losses.append(weighted_average_jaccard_losses)
                 train_ious.append(ious.mean())
                 print('IOUs: ', ious, ', mean: ', ious.mean())
                 print('Val IOUs:', val_iou, ', mean:', val_iou.mean())
 
+        end = time()
+        hours = (end-start) // 3600
+        minutes = ((end-start) - (hours * 3600)) / 60
+        print(f'End of training. Total training time of {hours} hours and {minutes}')    
         print(f'Writing training logs to {self.save_dir}...')
         makedirs(self.save_dir, exist_ok=True)
         with open(path.join(self.save_dir, 'trainResults.json'), 'w') as f:
@@ -165,6 +180,8 @@ class CGNet():
 
         epoch_loader = tqdm(loader)
         aggregate_cm = np.zeros((3,3))
+        jaccard_losses = []
+        batch_sizes = []
 
         for features, labels in epoch_loader:
         
@@ -176,12 +193,18 @@ class CGNet():
             predictions = torch.max(outputs, 1)[1]
             aggregate_cm += get_cm(predictions, labels, 3)
 
+            jaccard_losses.append(jaccard_loss(outputs, labels.cpu()).item())
+            batch_sizes.append(labels.shape[0])
+
         ious = get_iou_perClass(aggregate_cm)
+        batch_sizes = np.array(batch_sizes)
+        jaccard_losses = np.array(jaccard_losses)
+        weighted_average_jaccard_losses = (batch_sizes * jaccard_losses).sum() / batch_sizes.sum()
         if verbose:
             print('Evaluation stats:')
             print(aggregate_cm)
             print('IOUs: ', ious, ', mean: ', ious.mean())
-        return jaccard_loss(outputs,labels.cpu()).item(), ious
+        return weighted_average_jaccard_losses, ious
 
     def save_model(self, save_path: str):
         '''
