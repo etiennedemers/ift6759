@@ -4,15 +4,25 @@ ClimateNet is a Python library for deep learning-based Climate Science. It provi
 
 ## Usage
 
-Install the conda environment using `conda env create -f conda_env.yml`.
+Install the conda environment using 
+```sh
+conda env create -f conda_env.yml
+```
 
 Then, to add conda env kernel to jupyter notebooks, run the following commands: 
+```sh
 conda activate climatenet
 conda install ipykernel
 python -m ipykernel install --user --name climatenet --display-name "climatenet"
-
-You can find the data and a pre-trained model at [https://portal.nersc.gov/project/ClimateNet/](https://portal.nersc.gov/project/ClimateNet/).
+```
 Download the train and test data and the trained model, and you're good-to-go.
+To get the data, run the [download_data.ipynb](notebooks/download_data.ipynb) notebook.
+
+Alternatively, you can find the data and a pre-trained model at [https://portal.nersc.gov/project/ClimateNet/](https://portal.nersc.gov/project/ClimateNet/).
+To download, you can use the following command:
+```sh
+wget --recursive --no-parent -R "index.htm*" https://portal.nersc.gov/project/ClimateNet/climatenet_new/
+```
 
 The high-level API makes it easy to train a model from scratch or to use our models to run inference on your own climate data. Just download the model config (or write your own) and train the model using:
 
