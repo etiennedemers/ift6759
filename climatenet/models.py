@@ -92,6 +92,9 @@ class CGNet():
                 print(f'Epoch {epoch+1}:')
                 epoch_loader = tqdm(loader)
                 aggregate_cm = np.zeros((3,3))
+                
+                train_jaccard_losses = []
+                train_batch_sizes = []
 
                 train_jaccard_losses = []
                 train_batch_sizes = []
@@ -114,6 +117,9 @@ class CGNet():
                     loss.backward()
                     self.optimizer.step()
                     self.optimizer.zero_grad()
+                    
+                    train_jaccard_losses.append(loss.item())
+                    train_batch_sizes.append(labels.shape[0])
 
                     train_jaccard_losses.append(loss.item())
                     train_batch_sizes.append(labels.shape[0])
@@ -200,11 +206,38 @@ class CGNet():
         batch_sizes = np.array(batch_sizes)
         jaccard_losses = np.array(jaccard_losses)
         weighted_average_jaccard_losses = (batch_sizes * jaccard_losses).sum() / batch_sizes.sum()
+        
         if verbose:
             print('Evaluation stats:')
             print(aggregate_cm)
             print('IOUs: ', ious, ', mean: ', ious.mean())
+
         return weighted_average_jaccard_losses, ious
+    
+    def get_cm_for_each_file(self, dataset: ClimateDatasetLabeled):
+
+        assert self.config.pred_batch_size==1, "can only get the ious for each file if pred_batch_size=1"
+
+        self.network.eval()
+        collate = ClimateDatasetLabeled.collate
+        loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate, num_workers=1)
+
+        epoch_loader = tqdm(loader)
+        cms = []
+
+        for features, labels in epoch_loader:
+
+            features = torch.tensor(features.values).cuda()
+            labels = torch.tensor(labels.values).cuda()
+
+            with torch.no_grad():
+                outputs = torch.softmax(self.network(features), 1)
+            predictions = torch.max(outputs, 1)[1]
+
+            cms.append(get_cm(predictions, labels, 3))
+
+        return np.stack(cms)
+        
 
     def save_model(self, save_path: str):
         '''
