@@ -36,7 +36,7 @@ def get_cm(pred, gt, n_classes=3):
     return cm
 
 
-def currScore(output_path):
+def currScore(output_path, scoring_method):
     files = listdir('data/train')
     files.extend(listdir('data/test'))
     dates = set(['-'.join(file.split('-')[1:-2]) for file in files])
@@ -49,15 +49,22 @@ def currScore(output_path):
         else:
             score_list = []
             for f1, f2 in itertools.combinations(duplicates,2):
+
                 if f1 in listdir('data/test'):
                     base_path = 'data/test/'
                 else:
                     base_path = 'data/train/'
+
                 labels1 = torch.tensor(xr.load_dataset(base_path + f1)['LABELS'].values)
                 labels2 = torch.tensor(xr.load_dataset(base_path + f2)['LABELS'].values)
                 cm = get_cm(labels1, labels2)
-                ious = get_iou_perClass(cm)
-                score_list.append(ious)
+
+                if scoring_method == 'mean':
+                    score = get_iou_perClass(cm).mean()
+                else:
+                    score = get_iou_perClass(cm)
+
+                score_list.append(score)
             date_ious = np.array(score_list).mean(axis=0)
         score_dict.update({date:list(date_ious)})
 
