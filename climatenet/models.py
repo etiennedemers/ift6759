@@ -44,7 +44,7 @@ class CGNet():
         Stores the optimizer we use for training the model
     '''
 
-    def __init__(self, config: Config = None, model_path: str = None, save_dir: str = 'results/'):
+    def __init__(self, config: Config = None, model_path: str = None, save_dir: str = 'results/', transition_method='finetuning'):
     
         if config is not None and model_path is not None:
             raise ValueError('''Config and weight path set at the same time. 
@@ -57,7 +57,6 @@ class CGNet():
             self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=self.config.pretraining).cuda()
         elif model_path is not None:
             # Load model
-            print('Allo')
             self.config = Config(path.join(model_path, 'config.json'))
             self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=self.config.pretraining, finetuning=self.config.pretraining).cuda()
             self.network.load_state_dict(torch.load(path.join(model_path, 'weights.pth')))
@@ -66,14 +65,28 @@ class CGNet():
         else:
             raise ValueError('''You need to specify either a config or a model path.''')
 
+        self.transition_method = transition_method
         self.optimizer = Adam(self.network.parameters(), lr=self.config.lr) 
         self.save_dir = save_dir
         self.model_path = model_path
 
     def model_transition(self):
-        for p in self.network.parameters():
-            p.requires_grad = False
-        self.network.classifier = nn.Sequential(ConvBNPReLU(256, 128, 3, 2), Conv(128, len(self.config.labels), 1, 1)).cuda()
+        if self.transition_method not in ['finetune','inception','classifier']:
+            raise Exception('Invalid transition method!')
+        
+        if self.transition_method != 'finetune':
+            for p in self.network.parameters():
+                p.requires_grad = False
+
+        if self.transition_method == 'inception':
+            finalNet = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=0).cuda()
+            upsample = lambda x: F.interpolate(x, input.size()[2:], mode='bilinear',align_corners = False)
+            finalNet.level1_0 = nn.Sequential(ConvBNPReLU(256, 32, 3, 2)).cuda()
+            self.network.classifier = nn.Sequential(ConvBNPReLU(256, 256, 3, 2),upsample,finalNet()).cuda()
+
+        elif self.transition_method in ['classifier', 'finetune']:
+            self.network.classifier = nn.Sequential(ConvBNPReLU(256, 128, 3, 2), Conv(128,len(self.config.labels),1,1)).cuda()
+
 
     def pretrain(self):
         self.network.train()
@@ -130,7 +143,7 @@ class CGNet():
             ))
 
         
-    def train(self, curriculum: bool = False):
+    def train(self,train_data_path,curriculum: bool = False):
         '''Train the network on the given dataset for the given amount of epochs'''
         self.network.train()
         train_losses = []
@@ -143,12 +156,12 @@ class CGNet():
         else:
             training_phases = ['union']
 
-        val_dataset = ClimateDatasetLabeled('data/curriculum/validationSet', self.config)
+        val_dataset = ClimateDatasetLabeled(train_data_path+'/validationSet', self.config)
 
         start = time()
         for phase in training_phases:
             print(f'Starting {phase} training phase...')
-            train_dataset = ClimateDatasetLabeled('data/curriculum/'+phase+'Set', self.config)
+            train_dataset = ClimateDatasetLabeled(train_data_path+phase+'Set', self.config)
             collate = ClimateDatasetLabeled.collate
             loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=1, shuffle=True)
             for epoch in range(self.config.epochs[phase]):
