@@ -55,30 +55,69 @@ class Config():
     
 def results_plots(save_dir: str):
     sns.set()
-    with open(path.join(save_dir,'trainResultsRand.json'),'r') as f:
-        resultRand_dict = json.load(f)
-    train_losses_rand = resultRand_dict['train_losses']
-    train_ious_rand = resultRand_dict['train_ious']
+    with open(path.join(save_dir,'trainResultsUnion_b1_s42.json'),'r') as f:
+        resultUnion_dict = json.load(f)
+    train_losses_union = resultUnion_dict['train_losses']
+    train_ious_union = resultUnion_dict['train_ious']
+    val_ious_union = resultUnion_dict['valid_ious']
+    val_losses_union = resultUnion_dict['valid_losses']
 
-    with open(path.join(save_dir,'trainResultsCurr.json'),'r') as f:
-        resultRand_dict = json.load(f)
-    train_losses_curr = resultRand_dict['train_losses']
-    train_ious_curr = resultRand_dict['train_ious']
+    with open(path.join(save_dir,'trainResultsCurr_b1_s42.json'),'r') as f:
+        resultCurr_b1_dict = json.load(f)
+    train_losses_curr = resultCurr_b1_dict['train_losses']
+    train_ious_curr = resultCurr_b1_dict['train_ious']
+    val_ious_curr = resultCurr_b1_dict['valid_ious']
+    val_losses_curr = resultCurr_b1_dict['valid_losses']
 
-    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,5))
-    l1, = ax1.plot(train_losses_rand, label='Radom Sampling')
-    l2, = ax1.plot(train_losses_curr, label='Curriculum Sampling')
+    with open(path.join(save_dir,'trainResultsCurr_b2_s42.json'),'r') as f:
+        resultCurr_b2_dict = json.load(f)
+    train_losses_curr2 = resultCurr_b2_dict['train_losses']
+    train_ious_curr2 = resultCurr_b2_dict['train_ious']
+    val_ious_curr2 = resultCurr_b2_dict['valid_ious']
+    val_losses_curr2 = resultCurr_b2_dict['valid_losses']
+
+    with open(path.join(save_dir,'trainResultsCurr_b3_s42.json'),'r') as f:
+        resultCurr_b3_dict = json.load(f)
+    train_losses_curr3 = resultCurr_b3_dict['train_losses']
+    train_ious_curr3 = resultCurr_b3_dict['train_ious']
+    val_ious_curr3 = resultCurr_b3_dict['valid_ious']
+    val_losses_curr3 = resultCurr_b3_dict['valid_losses']
+
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2,2, figsize=(10,10))
+    plt.subplots_adjust(hspace=0.3)
+    l1, = ax1.plot(train_losses_union, label='Normal Training')
+    l2, = ax1.plot(train_losses_curr, label='Curriculum Training w/ batch size 1')
+    l3, = ax1.plot(train_losses_curr2, label='Curriculum Training w/ batch size 2')
+    l4, = ax1.plot(train_losses_curr3, label='Curriculum Training w/ batch size 3')
     ax1.set_title('Training Loss')
-    ax1.set_xlabel('Iterations')
+    ax1.set_xlabel('Epochs')
     ax1.set_ylabel('Jaccard Loss')
 
-    ax2.plot(train_ious_rand, label='Radom Sampling')
-    ax2.plot(train_ious_curr, label='Curriculum Sampling')
+    ax2.plot(train_ious_union, label='Normal Training')
+    ax2.plot(train_ious_curr, label='Curriculum Training w/ batch size 1')
+    ax2.plot(train_ious_curr2, label='Curriculum Training w/ batch size 2')
+    ax2.plot(train_ious_curr3, label='Curriculum Training w/ batch size 3')
     ax2.set_title('Training Mean IOUs')
     ax2.set_xlabel('Epochs')
     ax2.set_ylabel('Mean IOU')
 
-    fig.legend([l1,l2],['Random Sampling', 'Curriculum Sampling'], ncol=2, loc='upper center', bbox_to_anchor=(0.5, -0.01),
+    ax3.plot(val_losses_union, label='Normal Training')
+    ax3.plot(val_losses_curr, label='Curriculum Training w/ batch size 1')
+    ax3.plot(val_losses_curr2, label='Curriculum Training w/ batch size 2')
+    ax3.plot(val_losses_curr3, label='Curriculum Training w/ batch size 3')
+    ax3.set_title('Validation Loss')
+    ax3.set_xlabel('Epochs')
+    ax3.set_ylabel('Jaccard Loss')
+
+    ax4.plot(val_ious_union, label='Normal Training')
+    ax4.plot(val_ious_curr, label='Curriculum Training w/ batch size 1')
+    ax4.plot(val_ious_curr2, label='Curriculum Training w/ batch size 2')
+    ax4.plot(val_ious_curr3, label='Curriculum Training w/ batch size 3')
+    ax4.set_title('Validation Mean IOUs')
+    ax4.set_xlabel('Epochs')
+    ax4.set_ylabel('Mean IOU')
+
+    fig.legend([l1,l2,l3,l4],['Normal Training', 'Curriculum Training w/ Batch size 1','Curriculum Training w/ Batch size 2','Curriculum Training w/ Batch size 3'], ncol=2, loc='upper center', bbox_to_anchor=(0.5, 0.05),
           fancybox=True, facecolor='white')
     plt.savefig(path.join(save_dir,'resultsFigures.png'), bbox_inches='tight')
 
@@ -89,3 +128,4 @@ def print_currScore(currScore_path):
     plt.hist(currScore_dict.values(),bins=20, range=(0,1))
     plt.show()
         
+results_plots('./results/Runs')

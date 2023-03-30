@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
 import xarray as xr
+from time import time 
 from climatenet.utils.utils import Config
 from os import path, makedirs
 import json
@@ -43,7 +44,7 @@ class CGNet():
         Stores the optimizer we use for training the model
     '''
 
-    def __init__(self, config: Config = None, model_path: str = None, save_dir: str = 'results/'):
+    def __init__(self, config: Config = None, model_path: str = None, save_dir: str = 'results/', transition_method='finetuning'):
     
         if config is not None and model_path is not None:
             raise ValueError('''Config and weight path set at the same time. 
@@ -53,19 +54,96 @@ class CGNet():
         if config is not None:
             # Create new model
             self.config = config
-            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields))).cuda()
+            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=self.config.pretraining).cuda()
         elif model_path is not None:
             # Load model
             self.config = Config(path.join(model_path, 'config.json'))
-            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields))).cuda()
+            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=self.config.pretraining, finetuning=self.config.pretraining).cuda()
             self.network.load_state_dict(torch.load(path.join(model_path, 'weights.pth')))
+            if self.config.pretraining:
+                self.model_transition()
         else:
             raise ValueError('''You need to specify either a config or a model path.''')
 
+        self.transition_method = transition_method
         self.optimizer = Adam(self.network.parameters(), lr=self.config.lr) 
-        self.save_dir = save_dir       
+        self.save_dir = save_dir
+        self.model_path = model_path
+
+    def model_transition(self):
+        if self.transition_method not in ['finetune','inception','classifier']:
+            raise Exception('Invalid transition method!')
         
-    def train(self, curriculum: bool = False):
+        if self.transition_method != 'finetune':
+            for p in self.network.parameters():
+                p.requires_grad = False
+
+        if self.transition_method == 'inception':
+            finalNet = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=0).cuda()
+            upsample = lambda x: F.interpolate(x, input.size()[2:], mode='bilinear',align_corners = False)
+            finalNet.level1_0 = nn.Sequential(ConvBNPReLU(256, 32, 3, 2)).cuda()
+            self.network.classifier = nn.Sequential(ConvBNPReLU(256, 256, 3, 2),upsample,finalNet()).cuda()
+
+        elif self.transition_method in ['classifier', 'finetune']:
+            self.network.classifier = nn.Sequential(ConvBNPReLU(256, 128, 3, 2), Conv(128,len(self.config.labels),1,1)).cuda()
+
+
+    def pretrain(self):
+        self.network.train()
+        train_losses = []
+        start = time()
+        train_dataset = ClimateDatasetLabeled('data/pretrainSet', self.config)
+        collate = ClimateDatasetLabeled.collate
+        loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=1, shuffle=True)
+        for epoch in range(self.config.epochs['union']):
+
+            print(f'Epoch {epoch+1}:')
+            epoch_loader = tqdm(loader)
+
+            train_quad_losses = []
+            train_batch_sizes = []
+
+            for features, labels in epoch_loader:
+            
+                # Push data on GPU and pass forward
+                features = torch.tensor(features.values).cuda()
+                labels = features.clone()
+                    
+                outputs = self.network(features)
+
+                # Pass backward
+                loss = torch.mean((outputs - labels) ** 2)
+                epoch_loader.set_description(f'Loss: {loss.item()}')
+                loss.backward()
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
+                train_quad_losses.append(loss.item())
+                train_batch_sizes.append(labels.shape[0])
+
+            print('Epoch stats:')
+            train_batch_sizes = np.array(train_batch_sizes)
+            train_quad_losses = np.array(train_quad_losses)
+            weighted_average_quad_losses = (train_batch_sizes * train_quad_losses).sum() / train_batch_sizes.sum()
+            train_losses.append(weighted_average_quad_losses)
+            print(f'Epoch Loss:{weighted_average_quad_losses}')
+
+        end = time()
+        hours = (end-start) // 3600
+        minutes = ((end-start) - (hours * 3600)) / 60
+        print(f'End of training. Total training time of {hours} hours and {minutes} minutes')
+        print(f'Writing training logs to {self.save_dir}...')
+        makedirs(self.save_dir, exist_ok=True)
+        with open(path.join(self.save_dir, 'trainResults.json'), 'w') as f:
+            f.write(json.dumps(
+                {
+                    "train_losses": train_losses,
+                },
+                indent=4,
+            ))
+
+        
+    def train(self,train_data_path,curriculum: bool = False):
         '''Train the network on the given dataset for the given amount of epochs'''
         self.network.train()
         train_losses = []
@@ -78,19 +156,23 @@ class CGNet():
         else:
             training_phases = ['union']
 
-        val_dataset = ClimateDatasetLabeled('data/validationSet', self.config)
+        val_dataset = ClimateDatasetLabeled(train_data_path+'/validationSet', self.config)
 
+        start = time()
         for phase in training_phases:
             print(f'Starting {phase} training phase...')
-            train_dataset = ClimateDatasetLabeled('data/'+phase+'Set', self.config)
+            train_dataset = ClimateDatasetLabeled(train_data_path+phase+'Set', self.config)
             collate = ClimateDatasetLabeled.collate
-            loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=2, shuffle=True)
-            for epoch in range(1, self.config.epochs+1):
+            loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=1, shuffle=True)
+            for epoch in range(self.config.epochs[phase]):
 
-                print(f'Epoch {epoch}:')
+                print(f'Epoch {epoch+1}:')
                 epoch_loader = tqdm(loader)
                 aggregate_cm = np.zeros((3,3))
                 
+                train_jaccard_losses = []
+                train_batch_sizes = []
+
                 train_jaccard_losses = []
                 train_batch_sizes = []
 
@@ -116,6 +198,9 @@ class CGNet():
                     train_jaccard_losses.append(loss.item())
                     train_batch_sizes.append(labels.shape[0])
 
+                    train_jaccard_losses.append(loss.item())
+                    train_batch_sizes.append(labels.shape[0])
+
                 print('Epoch stats:')
                 ious = get_iou_perClass(aggregate_cm)
                 val_loss, val_iou = self.evaluate(val_dataset)
@@ -124,11 +209,15 @@ class CGNet():
                 train_batch_sizes = np.array(train_batch_sizes)
                 train_jaccard_losses = np.array(train_jaccard_losses)
                 weighted_average_jaccard_losses = (train_batch_sizes * train_jaccard_losses).sum() / train_batch_sizes.sum()
-                train_losses.append(train_jaccard_losses)
+                train_losses.append(weighted_average_jaccard_losses)
                 train_ious.append(ious.mean())
                 print('IOUs: ', ious, ', mean: ', ious.mean())
                 print('Val IOUs:', val_iou, ', mean:', val_iou.mean())
 
+        end = time()
+        hours = (end-start) // 3600
+        minutes = ((end-start) - (hours * 3600)) / 60
+        print(f'End of training. Total training time of {hours} hours and {minutes} minutes')
         print(f'Writing training logs to {self.save_dir}...')
         makedirs(self.save_dir, exist_ok=True)
         with open(path.join(self.save_dir, 'trainResults.json'), 'w') as f:
@@ -194,7 +283,7 @@ class CGNet():
         batch_sizes = np.array(batch_sizes)
         jaccard_losses = np.array(jaccard_losses)
         weighted_average_jaccard_losses = (batch_sizes * jaccard_losses).sum() / batch_sizes.sum()
-
+        
         if verbose:
             print('Evaluation stats:')
             print(aggregate_cm)
@@ -225,6 +314,7 @@ class CGNet():
             cms.append(get_cm(predictions, labels, 3))
 
         return np.stack(cms)
+        
 
     def save_model(self, save_path: str):
         '''
@@ -252,7 +342,7 @@ class CGNetModule(nn.Module):
     CGNet (Wu et al, 2018: https://arxiv.org/pdf/1811.08201.pdf) implementation.
     This is taken from their implementation, we do not claim credit for this.
     """
-    def __init__(self, classes=19, channels=4, M=3, N= 21, dropout_flag = False):
+    def __init__(self, classes=19, channels=4, M=3, N= 21, dropout_flag = False, pretraining=False, finetuning=False):
         """
         args:
           classes: number of classes in the dataset. Default is 19 for the cityscapes
@@ -260,6 +350,9 @@ class CGNetModule(nn.Module):
           N: the number of blocks in stage 3
         """
         super().__init__()
+        self.pretraining = pretraining
+        self.finetuning = finetuning
+
         self.level1_0 = ConvBNPReLU(channels, 32, 3, 2)      # feature map size divided 2, 1/2
         self.level1_1 = ConvBNPReLU(32, 32, 3, 1)                          
         self.level1_2 = ConvBNPReLU(32, 32, 3, 1)      
@@ -283,11 +376,13 @@ class CGNetModule(nn.Module):
             self.level3.append(ContextGuidedBlock(128 , 128, dilation_rate=4, reduction=16)) # CG block
         self.bn_prelu_3 = BNPReLU(256)
 
-        if dropout_flag:
+        if dropout_flag and not pretraining:
             print("have droput layer")
             self.classifier = nn.Sequential(nn.Dropout2d(0.1, False),Conv(256, classes, 1, 1))
-        else:
+        elif not dropout_flag and not pretraining:
             self.classifier = nn.Sequential(Conv(256, classes, 1, 1))
+        else:
+            self.classifier = nn.Sequential(Conv(256, channels, 1, 1))
 
         #init weights
         for m in self.modules():
@@ -308,6 +403,10 @@ class CGNetModule(nn.Module):
             return: segmentation map
         """
         # stage 1
+        if not self.finetuning and self.pretraining:
+            eps = 0.1
+            noise = eps * torch.randn(input.size()).cuda()
+            input += noise
         output0 = self.level1_0(input)
         output0 = self.level1_1(output0)
         output0 = self.level1_2(output0)
