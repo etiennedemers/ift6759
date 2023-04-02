@@ -20,6 +20,18 @@ from os import path, makedirs
 import json
 import pathlib
 
+
+class Interpolate(nn.Module):
+    def __init__(self, size, mode):
+        super(Interpolate, self).__init__()
+        self.interp = nn.functional.interpolate
+        self.size = size
+        self.mode = mode
+    
+    def forward(self, x):
+        x = self.interp(x, size=self.size, mode=self.mode,align_corners = False)
+        return x
+
 class CGNet():
     '''
     The high-level CGNet class. 
@@ -45,27 +57,26 @@ class CGNet():
     '''
 
     def __init__(self, config: Config = None, model_path: str = None, save_dir: str = 'results/', transition_method='finetuning'):
-    
-        if config is not None and model_path is not None:
-            raise ValueError('''Config and weight path set at the same time. 
-            Pass a config if you want to create a new model, 
-            and a weight_path if you want to load an existing model.''')
+        self.transition_method = transition_method
+        self.config = config
 
-        if config is not None:
-            # Create new model
-            self.config = config
-            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=self.config.pretraining).cuda()
-        elif model_path is not None:
+        if model_path is not None:
             # Load model
-            self.config = Config(path.join(model_path, 'config.json'))
+            self.config = config
+            if config is None:
+                self.config = Config(path.join(model_path, 'config.json'))
             self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=self.config.pretraining, finetuning=self.config.pretraining).cuda()
             self.network.load_state_dict(torch.load(path.join(model_path, 'weights.pth')))
             if self.config.pretraining:
                 self.model_transition()
-        else:
-            raise ValueError('''You need to specify either a config or a model path.''')
 
-        self.transition_method = transition_method
+        elif config is not None:
+            # Create new model
+            self.network = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=self.config.pretraining).cuda()
+        
+        else:
+                raise ValueError('''You need to specify either a config or a model path.''')
+
         self.optimizer = Adam(self.network.parameters(), lr=self.config.lr) 
         self.save_dir = save_dir
         self.model_path = model_path
@@ -80,9 +91,8 @@ class CGNet():
 
         if self.transition_method == 'inception':
             finalNet = CGNetModule(classes=len(self.config.labels), channels=len(list(self.config.fields)), pretraining=0).cuda()
-            upsample = lambda x: F.interpolate(x, input.size()[2:], mode='bilinear',align_corners = False)
-            finalNet.level1_0 = nn.Sequential(ConvBNPReLU(256, 32, 3, 2)).cuda()
-            self.network.classifier = nn.Sequential(ConvBNPReLU(256, 256, 3, 2),upsample,finalNet()).cuda()
+            finalNet.in_channels = 256
+            self.network.classifier = nn.Sequential(ConvBNPReLU(256, 4, 3, 2),Interpolate(size=(768,1152),mode='bilinear'),finalNet).cuda()
 
         elif self.transition_method in ['classifier', 'finetune']:
             self.network.classifier = nn.Sequential(ConvBNPReLU(256, 128, 3, 2), Conv(128,len(self.config.labels),1,1)).cuda()
@@ -95,7 +105,7 @@ class CGNet():
         train_dataset = ClimateDatasetLabeled('data/pretrainSet', self.config)
         collate = ClimateDatasetLabeled.collate
         loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=1, shuffle=True)
-        for epoch in range(self.config.epochs['union']):
+        for epoch in range(self.config.epochs['pretrain']):
 
             print(f'Epoch {epoch+1}:')
             epoch_loader = tqdm(loader)
@@ -352,25 +362,26 @@ class CGNetModule(nn.Module):
         super().__init__()
         self.pretraining = pretraining
         self.finetuning = finetuning
+        self.in_channels = channels
 
-        self.level1_0 = ConvBNPReLU(channels, 32, 3, 2)      # feature map size divided 2, 1/2
+        self.level1_0 = ConvBNPReLU(self.in_channels, 32, 3, 2)      # feature map size divided 2, 1/2
         self.level1_1 = ConvBNPReLU(32, 32, 3, 1)                          
         self.level1_2 = ConvBNPReLU(32, 32, 3, 1)      
 
         self.sample1 = InputInjection(1)  #down-sample for Input Injection, factor=2
         self.sample2 = InputInjection(2)  #down-sample for Input Injiection, factor=4
 
-        self.b1 = BNPReLU(32 + channels)
+        self.b1 = BNPReLU(32 + self.in_channels)
         
         #stage 2
-        self.level2_0 = ContextGuidedBlock_Down(32 + channels, 64, dilation_rate=2,reduction=8)  
+        self.level2_0 = ContextGuidedBlock_Down(32 + self.in_channels, 64, dilation_rate=2,reduction=8)  
         self.level2 = nn.ModuleList()
         for i in range(0, M-1):
             self.level2.append(ContextGuidedBlock(64 , 64, dilation_rate=2, reduction=8))  #CG block
-        self.bn_prelu_2 = BNPReLU(128 + channels)
+        self.bn_prelu_2 = BNPReLU(128 + self.in_channels)
         
         #stage 3
-        self.level3_0 = ContextGuidedBlock_Down(128 + channels, 128, dilation_rate=4, reduction=16) 
+        self.level3_0 = ContextGuidedBlock_Down(128 + self.in_channels, 128, dilation_rate=4, reduction=16) 
         self.level3 = nn.ModuleList()
         for i in range(0, N-1):
             self.level3.append(ContextGuidedBlock(128 , 128, dilation_rate=4, reduction=16)) # CG block
@@ -404,9 +415,12 @@ class CGNetModule(nn.Module):
         """
         # stage 1
         if not self.finetuning and self.pretraining:
-            eps = 0.1
-            noise = eps * torch.randn(input.size()).cuda()
-            input += noise
+            # Gaussian Noise
+            # eps = 0.1
+            # noise = eps * torch.randn(input.size()).cuda()
+            # input += noise
+            # Dropout
+            input = F.dropout(input)
         output0 = self.level1_0(input)
         output0 = self.level1_1(output0)
         output0 = self.level1_2(output0)
