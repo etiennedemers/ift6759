@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from os import path
+import os
 import seaborn as sns
 
 class Config():
@@ -52,74 +53,6 @@ class Config():
     def save(self, save_path: str):
         with open(save_path, 'w', encoding='utf-8') as f:
             json.dump(self.config_dict, f, ensure_ascii=False, indent=4)
-    
-def results_plots(save_dir: str):
-    sns.set()
-    with open(path.join(save_dir,'trainResultsUnion_b1_s42.json'),'r') as f:
-        resultUnion_dict = json.load(f)
-    train_losses_union = resultUnion_dict['train_losses']
-    train_ious_union = resultUnion_dict['train_ious']
-    val_ious_union = resultUnion_dict['valid_ious']
-    val_losses_union = resultUnion_dict['valid_losses']
-
-    with open(path.join(save_dir,'trainResultsCurr_b1_s42.json'),'r') as f:
-        resultCurr_b1_dict = json.load(f)
-    train_losses_curr = resultCurr_b1_dict['train_losses']
-    train_ious_curr = resultCurr_b1_dict['train_ious']
-    val_ious_curr = resultCurr_b1_dict['valid_ious']
-    val_losses_curr = resultCurr_b1_dict['valid_losses']
-
-    with open(path.join(save_dir,'trainResultsCurr_b2_s42.json'),'r') as f:
-        resultCurr_b2_dict = json.load(f)
-    train_losses_curr2 = resultCurr_b2_dict['train_losses']
-    train_ious_curr2 = resultCurr_b2_dict['train_ious']
-    val_ious_curr2 = resultCurr_b2_dict['valid_ious']
-    val_losses_curr2 = resultCurr_b2_dict['valid_losses']
-
-    with open(path.join(save_dir,'trainResultsCurr_b3_s42.json'),'r') as f:
-        resultCurr_b3_dict = json.load(f)
-    train_losses_curr3 = resultCurr_b3_dict['train_losses']
-    train_ious_curr3 = resultCurr_b3_dict['train_ious']
-    val_ious_curr3 = resultCurr_b3_dict['valid_ious']
-    val_losses_curr3 = resultCurr_b3_dict['valid_losses']
-
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2,2, figsize=(10,10))
-    plt.subplots_adjust(hspace=0.3)
-    l1, = ax1.plot(train_losses_union, label='Normal Training')
-    l2, = ax1.plot(train_losses_curr, label='Curriculum Training w/ batch size 1')
-    l3, = ax1.plot(train_losses_curr2, label='Curriculum Training w/ batch size 2')
-    l4, = ax1.plot(train_losses_curr3, label='Curriculum Training w/ batch size 3')
-    ax1.set_title('Training Loss')
-    ax1.set_xlabel('Epochs')
-    ax1.set_ylabel('Jaccard Loss')
-
-    ax2.plot(train_ious_union, label='Normal Training')
-    ax2.plot(train_ious_curr, label='Curriculum Training w/ batch size 1')
-    ax2.plot(train_ious_curr2, label='Curriculum Training w/ batch size 2')
-    ax2.plot(train_ious_curr3, label='Curriculum Training w/ batch size 3')
-    ax2.set_title('Training Mean IOUs')
-    ax2.set_xlabel('Epochs')
-    ax2.set_ylabel('Mean IOU')
-
-    ax3.plot(val_losses_union, label='Normal Training')
-    ax3.plot(val_losses_curr, label='Curriculum Training w/ batch size 1')
-    ax3.plot(val_losses_curr2, label='Curriculum Training w/ batch size 2')
-    ax3.plot(val_losses_curr3, label='Curriculum Training w/ batch size 3')
-    ax3.set_title('Validation Loss')
-    ax3.set_xlabel('Epochs')
-    ax3.set_ylabel('Jaccard Loss')
-
-    ax4.plot(val_ious_union, label='Normal Training')
-    ax4.plot(val_ious_curr, label='Curriculum Training w/ batch size 1')
-    ax4.plot(val_ious_curr2, label='Curriculum Training w/ batch size 2')
-    ax4.plot(val_ious_curr3, label='Curriculum Training w/ batch size 3')
-    ax4.set_title('Validation Mean IOUs')
-    ax4.set_xlabel('Epochs')
-    ax4.set_ylabel('Mean IOU')
-
-    fig.legend([l1,l2,l3,l4],['Normal Training', 'Curriculum Training w/ Batch size 1','Curriculum Training w/ Batch size 2','Curriculum Training w/ Batch size 3'], ncol=2, loc='upper center', bbox_to_anchor=(0.5, 0.05),
-          fancybox=True, facecolor='white')
-    plt.savefig(path.join(save_dir,'resultsFigures.png'), bbox_inches='tight')
 
 def print_currScore(currScore_path):
     with open(path.join(currScore_path),'r') as f:
@@ -127,5 +60,61 @@ def print_currScore(currScore_path):
     print(np.mean(([currScore_dict[k]  for k in currScore_dict.keys()]),axis=0))
     plt.hist(currScore_dict.values(),bins=20, range=(0,1))
     plt.show()
-        
-results_plots('./results/Runs')
+
+def results_plots(save_dir: str, file_list, label_list):
+    sns.set()
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2,2, figsize=(10,10))
+    plt.subplots_adjust(hspace=0.3)
+    axes = [ax1,ax2,ax3,ax4]
+    legend_list = [0] * 4
+    i=0
+
+    for file,label in zip(file_list,label_list):
+        with open(path.join(save_dir,file),'r') as f:
+            result_dict = json.load(f)
+        train_losses = result_dict['train_losses']
+        train_ious = result_dict['train_ious']
+        val_ious = result_dict['valid_ious']
+        val_losses = result_dict['valid_losses']
+
+        l, = ax1.plot(train_losses, label=label)
+        ax2.plot(train_ious, label=label)
+        ax3.plot(val_losses, label=label)
+        ax4.plot(val_ious, label=label)
+        legend_list[i] = l
+        i+=1
+
+    ax1.set_title('Training Loss')
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Jaccard Loss')
+
+    ax2.set_title('Training Mean IOUs')
+    ax2.set_xlabel('Epochs')
+    ax2.set_ylabel('Mean IOU')
+
+    ax3.set_title('Validation Loss')
+    ax3.set_xlabel('Epochs')
+    ax3.set_ylabel('Jaccard Loss')
+
+    ax4.set_title('Validation Mean IOUs')
+    ax4.set_xlabel('Epochs')
+    ax4.set_ylabel('Mean IOU')
+
+    fig.legend(legend_list,label_list, ncol=2, loc='upper center', bbox_to_anchor=(0.5, 0.05),
+          fancybox=True, facecolor='white')
+    plt.savefig(path.join(save_dir,'resultsFigures.png'), bbox_inches='tight')
+
+def pretraining_plot(save_dir):
+    sns.set()
+    with open(path.join(save_dir,'trainResults_pretrain.json'),'r') as f:
+        result_dict = json.load(f)
+    train_losses = result_dict['train_losses']
+    plt.plot(train_losses)
+    plt.title('Training MSE')
+    plt.xlabel('Epochs')
+    plt.ylabel('MSE')
+    plt.savefig(path.join(save_dir,'resultsFigures.png'), bbox_inches='tight')
+
+file_list = ['trainResultsUnion_b3_s442.json','trainResultsCurr_b3_s442.json','trainResultsCurr_b2_s442.json','trainResultsCurr_b1_s442.json']
+label_list = ['Normal Training', 'Curriculum Training w/ batch size 3','Curriculum Training w/ batch size 2','Curriculum Training w/ batch size 1']
+results_plots('results/OODRuns/',file_list,label_list)
