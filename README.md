@@ -18,7 +18,10 @@ python -m ipykernel install --user --name climatenet --display-name "climatenet"
 You're good to go to run the files in this repository, minus the data and trained model... which brings us to:
 ## Downloading and Generating Data
 Download the train and test data and the trained model.
-To get the data, run the [download_data.ipynb](notebooks/download_data.ipynb) notebook.
+To get the data, run the [get_data.py](get_data.py) file.
+```bash
+python get_data.py
+```
 
 Alternatively, you can find the data and a pre-trained model at [https://portal.nersc.gov/project/ClimateNet/](https://portal.nersc.gov/project/ClimateNet/).
 To download, you can use the following command:
@@ -26,7 +29,7 @@ To download, you can use the following command:
 wget --recursive --no-parent -R "index.htm*" https://portal.nersc.gov/project/ClimateNet/climatenet_new/
 ```
 
-Move the files into the following structure:
+If you used the previous command, move the files into the following structure:
 ```
 root
 ├── data
@@ -41,6 +44,11 @@ root
     └── new_baseline_model
         ├── config.json
         └── weights.pth <-- This
+```
+
+You can then run [get_data.py](get_data.py) with the `--no-download` flag to only generate the training data.
+```bash
+python get_data.py --no-download
 ```
 
 ## Rest of original ClimateNet README below
