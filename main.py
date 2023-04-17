@@ -7,7 +7,7 @@ from climatenet.utils.data import ClimateDatasetLabeled
 from climatenet.utils.utils import Config
 
 
-def finetuning(train_data_dir: str, config: Config, save_dir: str = 'results', method: str = 'classifier'):
+def finetuning(train_data_dir: str, config: Config, save_dir: str = 'results', method: str = 'classifier') -> (float, ndarray):
     config.pretraining = 1
     cgnet = CGNet(config)
     test = ClimateDatasetLabeled(path.join(train_data_path, 'testSet'), config)
@@ -18,7 +18,7 @@ def finetuning(train_data_dir: str, config: Config, save_dir: str = 'results', m
     print('Starting Transition Phase')
     cgnet = CGNet(config, model_path='pretrained_cgnet', save_dir=save_dir, transition_method=method)
     cgnet.train(train_data_dir)
-    cgnet.evaluate(test, verbose=True)
+    return cgnet.evaluate(test, verbose=True)
 
 
 def training(train_data_path: str, config: Config, curriculum: bool, save_dir: str = 'results') -> (float, ndarray):
