@@ -104,29 +104,40 @@ def sample_subset(output_path,n,method='rand'):
 
     save_datefiles(select_files,output_path)
     
-def create_datasets(data_path):
-    files = listdir('data/train')
-    files.extend(listdir('data/test'))
 
+def create_datasets(data_path,ood=False):
     with open('data/currScore.json','r') as f:
             score_dict = json.load(f)
 
+    files = listdir('data/train')
+    test_files = listdir('data/test')
+    files.extend(test_files)
+
+    if not ood: test_files = []
+
+    test_dates = set(['-'.join(file.split('-')[1:-2]) for file in test_files])
+    for k in test_dates:
+        score_dict.pop(k, None)
+
     unique = [k for k, v in score_dict.items() if score_dict[k]==-1]
     val_dates = unique[:40]
-    test_dates = unique[40:][:61]
+    if not ood: test_dates = unique[40:][:61]
 
-    tresh_dict = {'validation':'','test':'','simple':0.55,'medium':0.475,'hard':-10}
+    tresh_dict = {'test':'','validation':'','simple':0.55,'medium':0.475,'hard':-10}
 
     for dataset, tresh in tresh_dict.items():
+        print(dataset)
         if dataset == 'validation':
             select_dates = val_dates
         elif dataset == 'test':
             select_dates = test_dates
+            print(test_dates)
         else:
             select_dates = [k for k, v in score_dict.items() if score_dict[k]>tresh]
         
-        for k in select_dates:
-            score_dict.pop(k, None)
+        if dataset != 'test':
+            for k in select_dates:
+                score_dict.pop(k, None)
 
         select_files = []
         for date in select_dates:
