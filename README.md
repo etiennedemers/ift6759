@@ -15,7 +15,9 @@ conda activate climatenet
 conda install ipykernel
 python -m ipykernel install --user --name climatenet --display-name "climatenet"
 ```
-Download the train and test data and the trained model, and you're good-to-go.
+You're good to go to run the files in this repository, minus the data and trained model... which brings us to:
+## Downloading and Generating Data
+Download the train and test data and the trained model.
 To get the data, run the [download_data.ipynb](notebooks/download_data.ipynb) notebook.
 
 Alternatively, you can find the data and a pre-trained model at [https://portal.nersc.gov/project/ClimateNet/](https://portal.nersc.gov/project/ClimateNet/).
@@ -23,6 +25,25 @@ To download, you can use the following command:
 ```sh
 wget --recursive --no-parent -R "index.htm*" https://portal.nersc.gov/project/ClimateNet/climatenet_new/
 ```
+
+Move the files into the following structure:
+```
+root
+├── data
+│   ├── test
+│   │   └── data-**.nc <-- These
+│   └── train
+│       └── data-**.nc <-- These
+└── models
+    ├── original_baseline_model
+    │   ├── config.json
+    │   └── weights.pth <-- This
+    └── new_baseline_model
+        ├── config.json
+        └── weights.pth <-- This
+```
+
+## Rest of original ClimateNet README below
 
 The high-level API makes it easy to train a model from scratch or to use our models to run inference on your own climate data. Just download the model config (or write your own) and train the model using:
 
