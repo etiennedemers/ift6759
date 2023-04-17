@@ -33,7 +33,7 @@ def finetuning(train_data_dir: str, config: Config, save_dir: str = 'results', m
 def training(train_data_path: str, config: Config, curriculum: bool, save_dir: str = 'results') -> (float, ndarray):
     """
     Training phase of the CGNet model
-    :param train_data_path: The path to the directory containing the dataset (in form of .nc files)
+    :param train_data_path: The path to the directory containing the dataset in subdirectories (in form of .nc files)
     :param config: The model configuration.
     :param curriculum: Whether to use curriculum learning or not (True/False) Curriculum learning is not used by
     default and needs the data to be in a specific
