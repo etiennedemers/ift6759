@@ -33,9 +33,9 @@ class Interpolate(nn.Module):
         return x
 
 
-class CGNet():
-    '''
-    The high-level CGNet class. 
+class CGNet:
+    """
+    The high-level CGNet class.
     This allows training and running CGNet without interacting with PyTorch code.
     If you are looking for a higher degree of control over the training and inference,
     we suggest you directly use the CGNetModule class, which is a PyTorch nn.Module.
@@ -55,7 +55,7 @@ class CGNet():
         Stores the actual model (nn.Module)
     optimizer : torch.optim.Optimizer
         Stores the optimizer we use for training the model
-    '''
+    """
 
     def __init__(self, config: Config = None, model_path: str = None, save_dir: str = 'results/',
                  transition_method='finetuning'):
@@ -224,7 +224,7 @@ class CGNet():
                 train_batch_sizes = np.array(train_batch_sizes)
                 train_jaccard_losses = np.array(train_jaccard_losses)
                 weighted_average_jaccard_losses = (
-                                                              train_batch_sizes * train_jaccard_losses).sum() / train_batch_sizes.sum()
+                                                          train_batch_sizes * train_jaccard_losses).sum() / train_batch_sizes.sum()
                 train_losses.append(weighted_average_jaccard_losses)
                 train_ious.append(ious.mean())
                 print('IOUs: ', ious, ', mean: ', ious.mean())
@@ -248,7 +248,7 @@ class CGNet():
             ))
 
     def predict(self, dataset: ClimateDataset):
-        '''Make predictions for the given dataset and return them as xr.DataArray'''
+        """Make predictions for the given dataset and return them as xr.DataArray"""
         self.network.eval()
         collate = ClimateDataset.collate
         loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate)
@@ -272,7 +272,7 @@ class CGNet():
         return xr.concat(predictions, dim='time')
 
     def evaluate(self, dataset: ClimateDatasetLabeled, verbose: bool = False):
-        '''Evaluate on a dataset and return statistics'''
+        """Evaluate on a dataset and return statistics"""
         self.network.eval()
         collate = ClimateDatasetLabeled.collate
         loader = DataLoader(dataset, batch_size=self.config.pred_batch_size, collate_fn=collate, num_workers=1)
@@ -330,9 +330,9 @@ class CGNet():
         return np.stack(cms)
 
     def save_model(self, save_path: str):
-        '''
+        """
         Save model weights and config to a directory.
-        '''
+        """
         # create save_path if it doesn't exist
         pathlib.Path(save_path).mkdir(parents=True, exist_ok=True)
 
