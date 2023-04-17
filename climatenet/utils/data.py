@@ -5,6 +5,8 @@ import json
 import re
 import xarray as xr
 import numpy as np
+from typing import List
+
 from climatenet.utils.utils import Config
 
 
@@ -64,10 +66,10 @@ class ClimateDataset(Dataset):
 
 
 class ClimateDatasetLabeled(ClimateDataset):
-    '''
-    The labeled Climate Dataset class. 
+    """
+    The labeled Climate Dataset class.
     Corresponds to the normal Climate Dataset, but returns labels as well and batches accordingly
-    '''
+    """
 
     def __getitem__(self, idx: int):
         file_path: str = path.join(self.path, self.files[idx])
@@ -80,7 +82,13 @@ class ClimateDatasetLabeled(ClimateDataset):
         return xr.concat(data, dim='time'), xr.concat(labels, dim='time')
 
 
-def save_datefiles(files, output_path):
+def save_datefiles(files: List[str], output_path: str):
+    """
+    Saves the files in the output_path directory
+    :param files: The list of files to save
+    :param output_path: The path to the directory where the files will be saved
+    :return:
+    """
     for file in files:
         if file in listdir('data/test'):
             base_path = 'data/test/'
@@ -90,12 +98,19 @@ def save_datefiles(files, output_path):
         copy(path.join(base_path, file), output_path)
 
 
-def sample_subset(output_path, n, method='rand'):
+def sample_subset(output_path: str, n: int, method='rand'):
+    """
+    Samples a subset of the train and test datasets and saves them in the output_path directory
+    :param output_path: The path to the directory where the subset will be saved
+    :param n: The number of files to sample
+    :param method: The method to use to sample the files. Can be 'rand' or 'curriculum'
+    :return:
+    """
     files = listdir('data/train')
     files.extend(listdir('data/test'))
     if method == 'rand':
         select_files = np.random.permutation(files)[:n]
-    if method == 'curriculum':
+    elif method == 'curriculum':
         with open('data/currScore.json', 'r') as f:
             score_dict = json.load(f)
         select_dates = [k for k, v in sorted(score_dict.items(), key=lambda item: item[1], reverse=True)][:n]
@@ -103,11 +118,20 @@ def sample_subset(output_path, n, method='rand'):
         for date in select_dates:
             reg = re.compile('data-' + date)
             select_files.append([file for file in files if reg.match(file)][0])
+    else:
+        raise ValueError('Method must be either "rand" or "curriculum"')
 
     save_datefiles(select_files, output_path)
 
 
-def create_datasets(data_path, ood=False):
+def create_datasets(data_path: str = "data/", ood=False):
+    """
+    Loads the curriculum score file and creates the train, validation and test datasets, according to the scores in
+    the file. If ood is True, the test dataset is not created.
+    :param data_path: The path to the data directory
+    :param ood: Whether to create the test dataset or not
+    :return:
+    """
     with open('data/currScore.json', 'r') as f:
         score_dict = json.load(f)
 
@@ -115,7 +139,8 @@ def create_datasets(data_path, ood=False):
     test_files = listdir('data/test')
     files.extend(test_files)
 
-    if not ood: test_files = []
+    if not ood:
+        test_files = []
 
     test_dates = set(['-'.join(file.split('-')[1:-2]) for file in test_files])
     for k in test_dates:
@@ -123,7 +148,8 @@ def create_datasets(data_path, ood=False):
 
     unique = [k for k, v in score_dict.items() if score_dict[k] == -1]
     val_dates = unique[:40]
-    if not ood: test_dates = unique[40:][:61]
+    if not ood:
+        test_dates = unique[40:][:61]
 
     tresh_dict = {'test': '', 'validation': '', 'simple': 0.55, 'medium': 0.475, 'hard': -10}
 
@@ -148,6 +174,7 @@ def create_datasets(data_path, ood=False):
 
         output_path = path.join(data_path, dataset + 'Set')
         save_datefiles(select_files, output_path)
+        # Could save space by creating a symlink to the union set instead of copying the files.
         if dataset in ['simple', 'medium', 'hard']:
             output_path = path.join(data_path, 'unionSet')
             save_datefiles(select_files, output_path)
