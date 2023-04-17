@@ -11,15 +11,15 @@ from climatenet.utils.utils import Config
 
 
 class ClimateDataset(Dataset):
-    '''
-    The basic Climate Dataset class. 
+    """
+    The basic Climate Dataset class.
 
     Parameters
     ----------
     path : str
         The path to the directory containing the dataset (in form of .nc files)
     config : Config
-        The model configuration. This allows to automatically infer the fields we are interested in 
+        The model configuration. This allows to automatically infer the fields we are interested in
         and their normalisation statistics
 
     Attributes
@@ -32,7 +32,7 @@ class ClimateDataset(Dataset):
         Stores a sorted list of all the nc files in the Dataset
     length : int
         Stores the amount of nc files in the Dataset
-    '''
+    """
 
     def __init__(self, path: str, config: Config):
         self.path: str = path
@@ -154,12 +154,11 @@ def create_datasets(data_path: str = "data/", ood=False) -> None:
     tresh_dict = {'test': '', 'validation': '', 'simple': 0.55, 'medium': 0.475, 'hard': -10}
 
     for dataset, tresh in tresh_dict.items():
-        print(dataset)
+        print("Creating " + dataset + " dataset...")
         if dataset == 'validation':
             select_dates = val_dates
         elif dataset == 'test':
             select_dates = test_dates
-            print(test_dates)
         else:
             select_dates = [k for k, v in score_dict.items() if score_dict[k] > tresh]
 
