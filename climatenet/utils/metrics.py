@@ -36,7 +36,7 @@ def get_cm(pred, gt, n_classes=3):
     return cm
 
 
-def currScore(output_path, scoring_method):
+def currScore(output_path, scoring_method='mean'):
     files = listdir('data/train')
     files.extend(listdir('data/test'))
     dates = set(['-'.join(file.split('-')[1:-2]) for file in files])
@@ -65,8 +65,11 @@ def currScore(output_path, scoring_method):
                     score = get_iou_perClass(cm)
 
                 score_list.append(score)
-            date_ious = np.array(score_list).mean(axis=0)
-        score_dict.update({date:list(date_ious)})
+
+            date_score = np.array(score_list).mean(axis=0)
+            if scoring_method == 'class':
+                date_score = list(date_score)
+        score_dict.update({date:date_score})
 
     with open(output_path, 'w') as f:
         json.dump(score_dict,f)
