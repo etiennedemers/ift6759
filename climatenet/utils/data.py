@@ -82,7 +82,7 @@ class ClimateDatasetLabeled(ClimateDataset):
         return xr.concat(data, dim='time'), xr.concat(labels, dim='time')
 
 
-def save_datefiles(files: List[str], output_path: str):
+def save_datefiles(files: List[str], output_path: str) -> None:
     """
     Saves the files in the output_path directory
     :param files: The list of files to save
@@ -98,7 +98,7 @@ def save_datefiles(files: List[str], output_path: str):
         copy(path.join(base_path, file), output_path)
 
 
-def sample_subset(output_path: str, n: int, method='rand'):
+def sample_subset(output_path: str, n: int, method='rand') -> None:
     """
     Samples a subset of the train and test datasets and saves them in the output_path directory
     :param output_path: The path to the directory where the subset will be saved
@@ -124,7 +124,7 @@ def sample_subset(output_path: str, n: int, method='rand'):
     save_datefiles(select_files, output_path)
 
 
-def create_datasets(data_path: str = "data/", ood=False):
+def create_datasets(data_path: str = "data/", ood=False) -> None:
     """
     Loads the curriculum score file and creates the train, validation and test datasets, according to the scores in
     the file. If ood is True, the test dataset is not created.
