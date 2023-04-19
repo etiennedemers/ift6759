@@ -189,9 +189,6 @@ class CGNet:
                 train_jaccard_losses = []
                 train_batch_sizes = []
 
-                train_jaccard_losses = []
-                train_batch_sizes = []
-
                 for features, labels in epoch_loader:
                     # Push data on GPU and pass forward
                     features = torch.tensor(features.values).cuda()
