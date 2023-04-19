@@ -159,7 +159,7 @@ class CGNet:
             ))
 
     def train(self, train_data_path, curriculum: bool = False):
-        '''Train the network on the given dataset for the given amount of epochs'''
+        """Train the network on the given dataset for the given amount of epochs"""
         self.network.train()
         train_losses = []
         train_ious = []
@@ -221,7 +221,7 @@ class CGNet:
                 train_batch_sizes = np.array(train_batch_sizes)
                 train_jaccard_losses = np.array(train_jaccard_losses)
                 weighted_average_jaccard_losses = (
-                                                          train_batch_sizes * train_jaccard_losses).sum() / train_batch_sizes.sum()
+                                            train_batch_sizes * train_jaccard_losses).sum() / train_batch_sizes.sum()
                 train_losses.append(weighted_average_jaccard_losses)
                 train_ious.append(ious.mean())
                 print('IOUs: ', ious, ', mean: ', ious.mean())
