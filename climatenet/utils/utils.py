@@ -31,7 +31,7 @@ class Config:
         Stores an uninterpreted description string for the model. Put anything you want here.
     """
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, random_seed: int = None):
         self.config_dict = json.load(open(path))
 
         # TODO: Check structure
@@ -47,6 +47,8 @@ class Config:
         self.description = self.config_dict['description']
 
         # Make reproducible
+        if random_seed is not None:
+            self.seed = random_seed
         torch.manual_seed(self.seed)
         np.random.seed(self.seed)
 
