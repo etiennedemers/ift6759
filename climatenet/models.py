@@ -239,7 +239,8 @@ class CGNet:
                     "train_losses": train_losses,
                     "train_ious": train_ious,
                     "valid_losses": val_losses,
-                    "valid_ious": val_ious
+                    "valid_ious": val_ious,
+                    "seed": self.config.seed,
                 },
                 indent=4,
             ))
