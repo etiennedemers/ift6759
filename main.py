@@ -5,14 +5,16 @@ from os import path
 
 def finetuning(train_data_dir,config,save_dir: str = 'results',method: str = 'classifier'):
     config.pretraining = 1
-    cgnet = CGNet(config,transition_method=method)
+    cgnet = CGNet(config)
+    test = ClimateDatasetLabeled(path.join(train_data_path, 'testSet'), config)
     print('Starting Pretraining Phase')
     cgnet.pretrain()
     print('Saving Model...')
     cgnet.save_model('pretrained_cgnet')
-    print('Starting Finetuning Phase')
-    cgnet = CGNet(model_path='pretrained_cgnet',save_dir=save_dir)
+    print('Starting Transition Phase')
+    cgnet = CGNet(config,model_path='pretrained_cgnet',save_dir=save_dir,transition_method=method)
     cgnet.train(train_data_dir)
+    cgnet.evaluate(test,verbose=True)
 
 def training(train_data_path,config,curriculum,save_dir: str = 'results'):
     config.pretraining = 0
@@ -25,4 +27,5 @@ def training(train_data_path,config,curriculum,save_dir: str = 'results'):
 if __name__ == "__main__":
     config = Config('models_configs/CGNet.json')
     train_data_path = 'data/ood/'
-    finetuning(train_data_path,config)
+    finetuning(train_data_path,config,method='finetune')
+    #training(train_data_path,config,False)
