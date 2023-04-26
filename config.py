@@ -1,5 +1,6 @@
 import argparse
 
+
 def get_config_parser():
     parser = argparse.ArgumentParser(description="Run an experiment")
 

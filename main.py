@@ -1,9 +1,22 @@
-from climatenet.models import CGNet
-from climatenet.utils.utils import Config
-from climatenet.utils.data import ClimateDatasetLabeled
 from os import path
 
-def finetuning(train_data_dir,config,save_dir: str = 'results',method: str = 'classifier'):
+from numpy import ndarray
+
+from climatenet.models import CGNet
+from climatenet.utils.data import ClimateDatasetLabeled
+from climatenet.utils.utils import Config
+
+
+def finetuning(train_data_dir: str, config: Config, save_dir: str = 'results', method: str = 'classifier') -> (
+        float, ndarray):
+    """
+    Finetuning phase of the CGNet model
+    :param train_data_dir: The path to the directory containing the dataset (in form of .nc files)
+    :param config: The model configuration.
+    :param save_dir: The directory to save the results to
+    :param method: The method to use for the fine-tuning ('finetune', 'inception', 'classifier')
+    :return: Weighted jacard score and ndarray of iou
+    """
     config.pretraining = 1
     cgnet = CGNet(config)
     test = ClimateDatasetLabeled(path.join(train_data_path, 'testSet'), config)
@@ -12,20 +25,30 @@ def finetuning(train_data_dir,config,save_dir: str = 'results',method: str = 'cl
     print('Saving Model...')
     cgnet.save_model('pretrained_cgnet')
     print('Starting Transition Phase')
-    cgnet = CGNet(config,model_path='pretrained_cgnet',save_dir=save_dir,transition_method=method)
+    cgnet = CGNet(config, model_path='pretrained_cgnet', save_dir=save_dir, transition_method=method)
     cgnet.train(train_data_dir)
-    cgnet.evaluate(test,verbose=True)
+    return cgnet.evaluate(test, verbose=True)
 
-def training(train_data_path,config,curriculum,save_dir: str = 'results'):
+
+def training(train_data_path: str, config: Config, curriculum: bool, save_dir: str = 'results') -> (float, ndarray):
+    """
+    Training phase of the CGNet model
+    :param train_data_path: The path to the directory containing the dataset in subdirectories (in form of .nc files)
+    :param config: The model configuration.
+    :param curriculum: Whether to use curriculum learning or not (True/False) Curriculum learning is not used by
+    default and needs the data to be in a specific
+    :param save_dir: The directory to save the results to
+    :return:
+    """
     config.pretraining = 0
     test = ClimateDatasetLabeled(path.join(train_data_path, 'testSet'), config)
-    cgnet = CGNet(config,save_dir=save_dir)
-    cgnet.train(train_data_path,curriculum=curriculum)
-    cgnet.evaluate(test,verbose=True)
+    cgnet = CGNet(config, save_dir=save_dir)
+    cgnet.train(train_data_path, curriculum=curriculum)
+    return cgnet.evaluate(test, verbose=True)
 
 
 if __name__ == "__main__":
     config = Config('models_configs/CGNet.json')
     train_data_path = 'data/ood/'
-    finetuning(train_data_path,config,method='finetune')
-    #training(train_data_path,config,False)
+    finetuning(train_data_path, config, method='finetune')
+    # training(train_data_path,config,False)
