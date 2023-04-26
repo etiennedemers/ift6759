@@ -18,7 +18,7 @@ def get_config_parser():
     model.add_argument(
         "--model",
         type=str,
-        choices=[ "LogReg", "XGBoost"],
+        choices=[ "LogReg", "XGBoost", "Random"],
         default="XGBoost",
         help="name of the model to run (default: %(default)s).",
     )
