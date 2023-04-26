@@ -20,7 +20,7 @@ def main(args):
     else:
         print('Missing training path')
         return
-    
+
     if args.model_config is not None:
         print(f'Loading model config from {args.model_config}')
         with open(args.model_config) as f:
@@ -28,7 +28,7 @@ def main(args):
     else:
         raise ValueError('Please provide a model config json')
 
-    features = ['PSL','TMQ','U850','V850']
+    features = ['PSL', 'TMQ', 'U850', 'V850']
     X_train = train_df[features].values
     y_train = train_df['LABELS'].values
     X_test = test_df[features].values
@@ -45,8 +45,9 @@ def main(args):
     start = time.time()
     model.fit(X_train,y_train)
     print(f'Training Time: {(time.time()-start)/ 60} minutes')
+
     preds = model.predict(X_test)
-    cm = confusion_matrix(preds,y_test)
+    cm = confusion_matrix(preds, y_test)
 
     model_acc_tt = model.score(X_test, y_test)
     model_acc_tr = model.score(X_train, y_train)
@@ -56,7 +57,7 @@ def main(args):
     print("{} - Test accuracy: {:.4f}".format(args.model, model_acc_tt))
     print("{} - IOUS: {}".format(args.model, ious))
     print("{} - mean IOU: {}".format(args.model, ious.mean()))
-    
+
 
 if __name__ == "__main__":
     parser = get_config_parser()

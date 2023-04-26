@@ -30,30 +30,27 @@ def bootstrap_ious(cms_model1, cms_model2, B=10000):
 
 
 def compute_bootstrap_pct_positive_diff(diff_iou):
-    
     metrics = [
-        (diff_iou[:, 0] > 0).mean(), # percentage of time that model 2 outperforms model 1 on the background class
+        (diff_iou[:, 0] > 0).mean(),  # percentage of time that model 2 outperforms model 1 on the background class
         (diff_iou[:, 1] > 0).mean(),
         (diff_iou[:, 2] > 0).mean(),
         (diff_iou.mean(axis=1) > 0).mean()
     ]
-    
+
     return metrics
 
 
-def compute_bootstrap_confidence_intervals(diff_iou, alpha = 0.05):
-
+def compute_bootstrap_confidence_intervals(diff_iou, alpha=0.05):
     intervals = np.stack([
-        np.quantile(diff_iou[:, 0], [alpha/2, 1-alpha/2]),
-        np.quantile(diff_iou[:, 1], [alpha/2, 1-alpha/2]),
-        np.quantile(diff_iou[:, 2], [alpha/2, 1-alpha/2]),
-        np.quantile(diff_iou.mean(axis=1), [alpha/2, 1-alpha/2]),
+        np.quantile(diff_iou[:, 0], [alpha / 2, 1 - alpha / 2]),
+        np.quantile(diff_iou[:, 1], [alpha / 2, 1 - alpha / 2]),
+        np.quantile(diff_iou[:, 2], [alpha / 2, 1 - alpha / 2]),
+        np.quantile(diff_iou.mean(axis=1), [alpha / 2, 1 - alpha / 2]),
     ])
     return intervals
 
 
 def plot_bootstrap_results(diff_iou, figsize=(16, 3)):
-    
     fig, axs = plt.subplots(1, 4, figsize=figsize)
 
     axs[0].hist(diff_iou[:, 0], density=True, bins=100)
