@@ -1,5 +1,6 @@
 import argparse
 
+
 def get_config_parser():
     parser = argparse.ArgumentParser(description="Run an experiment")
 
@@ -18,7 +19,7 @@ def get_config_parser():
     model.add_argument(
         "--model",
         type=str,
-        choices=[ "LogReg", "XGBoost"],
+        choices=["LogReg", "XGBoost"],
         default="XGBoost",
         help="name of the model to run (default: %(default)s).",
     )
