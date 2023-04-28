@@ -70,45 +70,52 @@ def print_currScore(currScore_path):
     plt.show()
 
 
-def results_plots(save_dir: str, file_list, label_list):
+def results_plots(save_dir: str, file_list, label_list, loss=True):
     sns.set()
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(10, 10))
+    if loss:
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2,2, figsize=(10,10))
+    else:
+        fig, (ax2, ax4) = plt.subplots(1,2, figsize=(10,5))
     plt.subplots_adjust(hspace=0.3)
-    axes = [ax1, ax2, ax3, ax4]
     legend_list = [0] * 4
-    i = 0
+    i=0
 
-    for file, label in zip(file_list, label_list):
-        with open(path.join(save_dir, file), 'r') as f:
+    for file,label in zip(file_list,label_list):
+        with open(path.join(save_dir,file),'r') as f:
             result_dict = json.load(f)
         train_losses = result_dict['train_losses']
         train_ious = result_dict['train_ious']
         val_ious = result_dict['valid_ious']
         val_losses = result_dict['valid_losses']
 
-        l, = ax1.plot(train_losses, label=label)
-        ax2.plot(train_ious, label=label)
-        ax3.plot(val_losses, label=label)
+        if loss: ax1.plot(train_losses, label=label)
+        l, = ax2.plot(train_ious, label=label)
+        if loss: ax3.plot(val_losses, label=label)
         ax4.plot(val_ious, label=label)
         legend_list[i] = l
-        i += 1
+        i+=1
 
-    ax1.set_title('Training Loss')
-    ax1.set_xlabel('Epochs')
-    ax1.set_ylabel('Jaccard Loss')
+    if loss:
+        ax1.set_title('Training Loss')
+        ax1.set_xlabel('Epochs')
+        ax1.set_ylabel('Jaccard Loss')
 
     ax2.set_title('Training Mean IOUs')
     ax2.set_xlabel('Epochs')
     ax2.set_ylabel('Mean IOU')
 
-    ax3.set_title('Validation Loss')
-    ax3.set_xlabel('Epochs')
-    ax3.set_ylabel('Jaccard Loss')
+    if loss:
+        ax3.set_title('Validation Loss')
+        ax3.set_xlabel('Epochs')
+        ax3.set_ylabel('Jaccard Loss')
 
     ax4.set_title('Validation Mean IOUs')
     ax4.set_xlabel('Epochs')
     ax4.set_ylabel('Mean IOU')
 
-    fig.legend(legend_list, label_list, ncol=2, loc='upper center', bbox_to_anchor=(0.5, 0.05),
-               fancybox=True, facecolor='white')
-    plt.savefig(path.join(save_dir, 'resultsFigures.png'), bbox_inches='tight')
+    if loss: anchor = (0.5, 0.05)
+    else: anchor = (0.5, 0)
+
+    fig.legend(legend_list,label_list, ncol=2, loc='upper center', bbox_to_anchor=anchor,
+          fancybox=True, facecolor='white')
+    plt.savefig(path.join(save_dir,'resultsFigures.png'), bbox_inches='tight')
