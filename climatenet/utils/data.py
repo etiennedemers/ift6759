@@ -127,9 +127,9 @@ def sample_subset(output_path: str, n: int, method='rand') -> None:
 def create_datasets(data_path: str = "data/", ood=False) -> None:
     """
     Loads the curriculum score file and creates the train, validation and test datasets, according to the scores in
-    the file. If ood is True, the test dataset is not created.
+    the file. If ood is True, the test dataset is created with future dates.
     :param data_path: The path to the data directory
-    :param ood: Whether to create the test dataset or not
+    :param ood: Whether to create the test dataset is ood.
     :return:
     """
     with open('data/currScore.json', 'r') as f:
