@@ -64,6 +64,8 @@ This will output to a new directory `training_results` with other subdirectories
 
 You can then generate accompanying plots with the `notebooks/graph_multiple_runs.ipynb` notebook.
 
+The script TestSimple.py is available to test simple models on a subset of the entire dataset. The simple models included are a Random Classifier, Logistic Regression and XGBoost. To modify the model to be run, simply modify the model and model_config arguments in config.py. 
+
 ## Rest of original ClimateNet README below
 
 The high-level API makes it easy to train a model from scratch or to use our models to run inference on your own climate data. Just download the model config (or write your own) and train the model using:
