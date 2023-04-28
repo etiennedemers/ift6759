@@ -19,7 +19,7 @@ def finetuning(train_data_path: str, config: Config, save_dir: str = 'results', 
     """
     config.pretraining = 1
     cgnet = CGNet(config)
-    test = ClimateDatasetLabeled(path.join(train_data_path, 'testSet'), config)
+    test = ClimateDatasetLabeled(path.join(train_data_dir, 'testSet'), config)
     print('Starting Pretraining Phase')
     cgnet.pretrain(train_data_path)
     print('Saving Model...')
@@ -49,6 +49,6 @@ def training(train_data_path: str, config: Config, curriculum: bool, save_dir: s
 
 if __name__ == "__main__":
     config = Config('models_configs/CGNet.json')
-    train_data_path = 'data/ood/'
-    finetuning(train_data_path, config, method='finetune')
+    train_data_path = 'data/'
+    finetuning(train_data_path, config, save_dir="training_results/finetuning", method='finetune')
     # training(train_data_path,config,False)
