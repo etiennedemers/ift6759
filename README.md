@@ -6,7 +6,7 @@ ClimateNet is a Python library for deep learning-based Climate Science. It provi
 - Tested on Linux
 - Requires CUDA capable GPU
 - Requires anaconda
-- If foregoing anaconda, python=3.8.5 and the other packages can be found within conda_end.yml
+- If foregoing anaconda, python=3.8.5 and the other packages can be found within conda_env.yml
 
 ## Usage
 
