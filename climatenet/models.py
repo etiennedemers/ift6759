@@ -104,11 +104,11 @@ class CGNet:
             self.network.classifier = nn.Sequential(ConvBNPReLU(256, 128, 3, 2),
                                                     Conv(128, len(self.config.labels), 1, 1)).cuda()
 
-    def pretrain(self):
+    def pretrain(self,train_data_path):
         self.network.train()
         train_losses = []
         start = time()
-        train_dataset = ClimateDatasetLabeled('data/pretrainSet', self.config)
+        train_dataset = ClimateDatasetLabeled(train_data_path + 'pretrainSet', self.config)
         collate = ClimateDatasetLabeled.collate
         loader = DataLoader(train_dataset, batch_size=self.config.train_batch_size, collate_fn=collate, num_workers=1,
                             shuffle=True)
