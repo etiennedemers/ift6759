@@ -64,3 +64,5 @@ if __name__ == "__main__":
     print("Change data")
     currScore("data/currScore.json", scoring_method="mean")
     create_datasets(data_path="data/", ood=True)
+    # Rename train folder to pretrainSet
+    os.rename("data/train", "data/pretrainSet")
