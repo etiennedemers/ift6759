@@ -6,6 +6,7 @@ ClimateNet is a Python library for deep learning-based Climate Science. It provi
 - Tested on Linux
 - Requires CUDA capable GPU
 - Requires anaconda
+- If foregoing anaconda, python=3.8.5 and the other packages can be found within conda_end.yml
 
 ## Usage
 
@@ -63,6 +64,8 @@ python run_multiple.py
 This will output to a new directory `training_results` with other subdirectories for the types and run number.
 
 You can then generate accompanying plots with the `notebooks/graph_multiple_runs.ipynb` notebook.
+
+If you with to run one at a time, you can also use the [main.py](main.py) file to run a single experiment at a time, with a seed chosen in the config file.
 
 ## Rest of original ClimateNet README below
 
