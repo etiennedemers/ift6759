@@ -63,4 +63,4 @@ if __name__ == "__main__":
             f.write(r.content)
     print("Change data")
     currScore("data/currScore.json", scoring_method="mean")
-    create_datasets(data_path="data/", ood=False)
+    create_datasets(data_path="data/", ood=True)
